@@ -1,0 +1,111 @@
+---
+title: "Practical Machine Learning - Prediction Assignment"
+author: "sinhajy"
+date: "18-Dec-2017"
+---
+
+## Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement -  a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+Data
+
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+Both the files were downloaded for use in this assignment on December 18, 2017 at 7:10am GMT + 5:30 hours.
+
+#### Define library and set seed
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+library(ElemStatLearn)
+library(caret)
+library(rpart)
+library(randomForest)
+library(RCurl)
+set.seed(2014)
+```
+
+#### Data Preparation
+```{r echo=FALSE}
+pml_trn_csv <- read.csv(file = "pml-training.csv", header=TRUE, sep=",", na.strings=c("NA",""))
+pml_trn_csv <- pml_trn_csv[,-1]
+inTrain = createDataPartition(pml_trn_csv$classe, p=0.60, list=FALSE)
+training = pml_trn_csv[inTrain,]
+validating = pml_trn_csv[-inTrain,]
+```
+
+#### Number of rows and columns of data in the training set
+```{r echo=FALSE}
+dim(training)
+```
+
+#### Number of rows and columns of data in the validating set
+```{r echo=FALSE}
+dim(validating)
+```
+
+#### Number of cols with less than 60% of data
+```{r echo=FALSE}
+sum((colSums(!is.na(training[,-ncol(training)])) < 0.6*nrow(training)))
+```
+
+#### Apply our definition of remove columns that most doesn't have data, before its apply to the model.
+```{r echo=FALSE}
+Keep <- c((colSums(!is.na(training[,-ncol(training)])) >= 0.6*nrow(training)))
+training   <-  training[,Keep]
+validating <- validating[,Keep]
+```
+
+#### Number of rows and columns of data in the final training set
+```{r echo=FALSE}
+dim(training)
+```
+
+#### Number of rows and columns of data in the final validating set
+```{r echo=FALSE}
+dim(validating)
+```
+
+#### Random Forest model is chosen considering the non linearity of the data
+```{r echo=FALSE}
+model <- randomForest(classe~.,data=training)
+print(model)
+```
+
+#### Proceeding with the verification of variable importance measures as produced by random Forest
+```{r echo=FALSE}
+importance(model)
+```
+
+#### Model result is verified through confusion matrix
+```{r echo=FALSE}
+confusionMatrix(predict(model,newdata=validating[,-ncol(validating)]),validating$classe)
+```
+
+#### Confirmed the accuracy of the validating data set
+```{r echo=FALSE}
+accuracy <-c(as.numeric(predict(model,newdata=validating[,-ncol(validating)])==validating$classe))
+accuracy <-sum(accuracy)*100/nrow(validating)
+print(accuracy)
+```
+Model accuracy derived at 99.9%
+
+#### Model testing starts here in order to
+1. Provide new values in the testing csv provided
+2. Perform similar cleaning operation
+3. Coerce columns of testing data set for the same class of previous data set
+```{r echo=FALSE}
+pml_test_csv <- read.csv(file = "pml-testing.csv", header=TRUE, sep=",", na.strings=c("NA",""))
+pml_test_csv <- pml_test_csv[,-1] # Remove the first column that represents a ID 
+pml_test_csv <- pml_test_csv[ , Keep] # Keep the same columns of testing dataset
+pml_test_csv <- pml_test_csv[,-ncol(pml_test_csv)] # Remove the problem ID
+testing <- rbind(training[100, -59] , pml_test_csv)
+row.names(testing) <- c(100, 1:20)
+predictions <- predict(model,newdata=testing[-1,])
+print(predictions)
+
+endTime <- Sys.time()
+endTime
+```
